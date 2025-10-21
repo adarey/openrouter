@@ -1,0 +1,9 @@
+services:
+  streamlit-app:
+    build: .
+    container_name: streamlit-app
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    volumes:
+      - .:/app
