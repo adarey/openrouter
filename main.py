@@ -1,130 +1,82 @@
+import streamlit as st
 import requests
-import json
 
-def get_openrouter_free_models():
-    """
-    Script pour lister les modèles gratuits d'OpenRouter
-    avec indication des modèles non censurés
-    """
-    
-    # URL de l'API OpenRouter pour récupérer la liste des modèles
+st.set_page_config(page_title="OpenRouter • IA gratuite dynamique", page_icon="🧩")
+st.title("🧩 Modèles gratuits dynamiques – OpenRouter")
+st.markdown("Liste automatisée depuis l’API officielle OpenRouter.\nSélectionne, envoie un prompt, reçois la réponse !")
+
+@st.cache_data(ttl=3600)
+def fetch_models():
     url = "https://openrouter.ai/api/v1/models"
-    
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
+    headers = {"Content-Type": "application/json"}
+    models = []
     try:
-        # Récupérer la liste des modèles
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        
-        models = response.json()
-        
-        # Filtrer les modèles gratuits
-        free_models = []
-        uncensored_models = []
-        
-        for model in models.get('data', []):
-            model_id = model.get('id', '')
-            name = model.get('name', '')
-            pricing = model.get('pricing', {})
-            
-            # Vérifier si le modèle est gratuit
-            prompt_price = float(pricing.get('prompt', 0))
-            completion_price = float(pricing.get('completion', 0))
-            
-            if prompt_price == 0 and completion_price == 0:
-                model_info = {
-                    'id': model_id,
-                    'name': name,
-                    'context_length': model.get('context_length', 'N/A'),
-                    'description': model.get('description', '')
-                }
-                
-                free_models.append(model_info)
-                
-                # Identifier les modèles non censurés
-                if any(keyword in model_id.lower() or keyword in name.lower() 
-                       for keyword in ['uncensored', 'dolphin', 'venice', 'lumimaid']):
-                    uncensored_models.append(model_info)
-        
-        # Afficher les résultats
-        print("=" * 80)
-        print(f"MODÈLES GRATUITS OPENROUTER ({len(free_models)} trouvés)")
-        print("=" * 80)
-        
-        for model in free_models:
-            print(f"\n✓ {model['name']}")
-            print(f"  ID: {model['id']}")
-            print(f"  Contexte: {model['context_length']} tokens")
-            if model['description']:
-                print(f"  Description: {model['description'][:100]}...")
-        
-        print("\n" + "=" * 80)
-        print(f"MODÈLES NON CENSURÉS GRATUITS ({len(uncensored_models)} trouvés)")
-        print("=" * 80)
-        
-        for model in uncensored_models:
-            print(f"\n🔓 {model['name']}")
-            print(f"  ID: {model['id']}")
-            print(f"  Contexte: {model['context_length']} tokens")
-        
-        # Enregistrer dans un fichier JSON
-        output = {
-            'free_models': free_models,
-            'uncensored_models': uncensored_models,
-            'total_free': len(free_models),
-            'total_uncensored': len(uncensored_models)
-        }
-        
-        with open('openrouter_free_models.json', 'w', encoding='utf-8') as f:
-            json.dump(output, f, indent=2, ensure_ascii=False)
-        
-        print(f"\n✅ Résultats sauvegardés dans 'openrouter_free_models.json'")
-        
-        return output
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erreur lors de la récupération des modèles: {e}")
-        return None
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json().get('data', [])
+        for m in data:
+            pricing = m.get('pricing', {})
+            if float(pricing.get('prompt', 0)) == 0 and float(pricing.get('completion', 0)) == 0:
+                # Détection du type rapide
+                # (Tu peux étoffer par mot-clé dans l'id ou name si tu veux affiner)
+                if any(x in m.get('id', '').lower() or x in m.get('name', '').lower() for x in ['uncensored', 'venice', 'dolphin', 'mai', 'lumimaid']):
+                    model_type = "Texte (non censuré)"
+                else:
+                    model_type = "Texte"
+                models.append({
+                    'id': m.get('id'),
+                    'name': m.get('name'),
+                    'type': model_type,
+                    'desc': m.get('description', '')[:96] or '-'
+                })
+        return models
+    except Exception as e:
+        st.error(f"Erreur chargement modèles API OpenRouter : {e}")
+        return []
 
-def test_model_interaction(model_id, api_key):
-    """
-    Fonction pour tester l'interaction avec un modèle
-    """
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "Test OpenRouter"
-    }
-    
-    payload = {
-        "model": model_id,
-        "messages": [
-            {"role": "user", "content": "Bonjour, peux-tu te présenter?"}
-        ]
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        
-        print(f"\n✅ Test réussi avec {model_id}")
-        print(f"Réponse: {result['choices'][0]['message']['content']}")
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erreur avec {model_id}: {e}")
+models = fetch_models()
 
-# Exécution principale
-if __name__ == "__main__":
-    print("🔍 Récupération des modèles gratuits OpenRouter...\n")
-    results = get_openrouter_free_models()
-    
-    # Pour tester l'interaction, décommentez et ajoutez votre clé API:
-    # API_KEY = "votre_cle_api_openrouter"
-    # test_model_interaction("venice/uncensored:free", API_KEY)
+st.sidebar.header("🔑 Clé API OpenRouter")
+api_key = st.sidebar.text_input("Entre ta clé API OpenRouter :", type="password")
+if not api_key:
+    st.sidebar.warning("Ajoute ta clé API OpenRouter pour interroger les modèles.")
+
+if models:
+    models_names = [f"{m['name']} – {m['type']}" for m in models]
+    model_idx = st.selectbox("Choisis ton modèle IA :", models_names)
+    model_selected = models[models_names.index(model_idx)]
+
+    st.write(f"**Type :** {model_selected['type']}")
+    st.write(f"**Description :** {model_selected['desc']}")
+
+    prompt = st.text_area("Prompt à envoyer :", "")
+    if st.button("Envoyer le prompt"):
+        if not api_key:
+            st.error("Tu dois saisir une clé API OpenRouter dans la barre latérale.")
+        elif not prompt.strip():
+            st.warning("Entre un prompt puis réessaie !")
+        else:
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Streamlit OpenRouter"
+            }
+            payload = {
+                "model": model_selected['id'],
+                "messages": [{"role": "user", "content": prompt.strip()}],
+            }
+            try:
+                r = requests.post(url, json=payload, headers=headers, timeout=30)
+                r.raise_for_status()
+                result = r.json()
+                answer = result["choices"][0]["message"]["content"]
+                st.success("Réponse de l'IA :")
+                st.write(answer)
+            except Exception as e:
+                st.error(f"Erreur API : {e}")
+else:
+    st.warning("Aucun modèle gratuit trouvé.")
+
+st.caption("Source : openrouter.ai – liste dynamique, prompt direct !")
