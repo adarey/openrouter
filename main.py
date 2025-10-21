@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="OpenRouter • IA gratuite dynamique", page_icon="🧩")
-st.title("😋 Modèles gratuits dynamiques – OpenRouter")
+st.set_page_config(page_title="OpenRouter • IA gratuite", page_icon="🧩")
+st.title("😋 Modèles gratuits – OpenRouter")
 st.markdown("Liste automatisée depuis l’API officielle OpenRouter.\nSélectionne, envoie un prompt, reçois la réponse !")
 
 @st.cache_data(ttl=3600)
