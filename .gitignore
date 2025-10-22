@@ -1,5 +1,6 @@
 # Ignorer tous les fichiers et dossiers cachés (qui commencent par un point)
 .*
+exports/
 
 # ✅ Exception : garder le fichier .gitignore
 !.gitignore
